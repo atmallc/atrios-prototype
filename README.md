@@ -108,13 +108,13 @@ Hosting: Use a managed PaaS (e.g., Vercel, Heroku, or AWS Amplify) for fast depl
 Infrastructure: Use managed DB (e.g., Supabase, Firebase, or AWS RDS).
 
 Tech Stack Recommendation:
-Frontend: React (Next.js for SSR, easy deployment, and fast dev), TailwindCSS for UI.
-Backend: Python - Fast API. For rapid iteration, consider serverless functions (Vercel, AWS Lambda).
-Database: PostgreSQL (hosted on Supabase or AWS RDS)
+Frontend: React (Next.js for SSR), TailwindCSS for UI.
+Backend: Python - Fast API. For rapid iteration, consider serverless functions (Vercel).
+Database: PostgreSQL (hosted on Supabase)
 Auth: Auth0
 Payments: Stripe (test mode for prototype).
-Email: SendGrid/Postmark.
-Infra/Hosting: Vercel, or AWS Amplify or Heroku.
+Email: SendGrid.
+Infra/Hosting: Vercel.
 Other: GitHub Actions for CI/CD.
 
 
