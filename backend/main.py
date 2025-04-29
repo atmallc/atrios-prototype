@@ -15,11 +15,11 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO)
 
-@app.get("/")
+@app.get("/api/")
 def read_root():
     return {"message": "Hello World from backend!"}
 
-@app.post("/log-frontend-message")
+@app.post("/api/log-frontend-message")
 def log_frontend_message():
     logging.info("hello backend world from front-end")
     return {"status": "logged"}
