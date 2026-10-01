@@ -1,0 +1,18 @@
+[package]
+name = "pixie-init"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "pixie-init"
+path = "src/main.rs"
+
+[dependencies]
+pixie-skill.workspace = true
+pixie-runtime.workspace = true
+pixie-agent.workspace = true
+pixie-skills-basic.workspace = true
+libc = "0.2"
+font8x8 = "0.3"
+serde_json.workspace = true

@@ -1,0 +1,11 @@
+[package]
+name = "pixie-image"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Builds Pixie boot images for Android phones"
+
+[dependencies]
+flate2 = "1.1.10"
+lz4_flex = "0.14.0"
+sha1_smol = "1.0.1"
