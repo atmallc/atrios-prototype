@@ -1,0 +1,13 @@
+[package]
+name = "pixie-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pixie-skill.workspace = true
+pixie-runtime.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+pixie-skills-basic.workspace = true

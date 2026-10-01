@@ -1,0 +1,15 @@
+[package]
+name = "pixie-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "pixie"
+path = "src/main.rs"
+
+[dependencies]
+pixie-skill.workspace = true
+pixie-runtime.workspace = true
+pixie-agent.workspace = true
+pixie-skills-basic.workspace = true
