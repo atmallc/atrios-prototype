@@ -39,6 +39,8 @@ pub enum Permission {
     Camera,
     Display,
     Microphone,
+    /// Playing sound through the speaker.
+    Audio,
     Telephony,
     Network,
     Storage,

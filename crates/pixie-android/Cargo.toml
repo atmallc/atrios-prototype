@@ -1,11 +1,12 @@
 [package]
-name = "pixie-init"
+name = "pixie-android"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "pixied: Pixie's agent as a background service on a phone running Android (LineageOS)"
 
 [[bin]]
-name = "pixie-init"
+name = "pixied"
 path = "src/main.rs"
 
 [dependencies]
@@ -14,7 +15,5 @@ pixie-runtime.workspace = true
 pixie-agent.workspace = true
 pixie-skills-basic.workspace = true
 pixie-script = { path = "../pixie-script" }
-libc = "0.2"
-font8x8 = "0.3"
 serde.workspace = true
 serde_json.workspace = true

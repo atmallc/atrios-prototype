@@ -1,3 +1,8 @@
 /target
 *.ppm
 /out
+
+# Google factory images and boot images derived from them are not redistributable
+*.img
+*-factory-*.zip
+image-walleye-*.zip

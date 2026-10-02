@@ -1,0 +1,17 @@
+[package]
+name = "pixie-script"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sandboxed scripted skills: skills written as Rhai scripts, run with only the permissions they were granted"
+
+[dependencies]
+pixie-skill.workspace = true
+pixie-skills-basic.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rhai = { version = "1", default-features = false, features = ["std", "sync", "serde", "no_module", "no_time"] }
+
+[[bin]]
+name = "pixie-check"
+path = "src/bin/check.rs"

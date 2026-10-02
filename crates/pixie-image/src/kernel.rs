@@ -10,6 +10,7 @@ use flate2::{bufread::GzDecoder, write::GzEncoder, Compression as GzLevel};
 use std::io::{Read, Write};
 
 const LZ4_LEGACY_MAGIC: u32 = 0x184C_2102;
+const LZ4_FRAME_MAGIC: u32 = 0x184D_2204;
 /// The kernel's legacy LZ4 format splits input into 8 MiB blocks.
 const LZ4_LEGACY_BLOCK: usize = 8 << 20;
 const ARM64_IMAGE_MAGIC: &[u8; 4] = b"ARM\x64";
@@ -19,6 +20,8 @@ pub enum Compression {
     None,
     Gzip,
     Lz4Legacy,
+    /// The standard `.lz4` frame format, as used by the stock Pixel 2 kernel.
+    Lz4Frame,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,6 +41,18 @@ impl Kernel {
                 compression: Compression::Lz4Legacy,
                 image,
                 appended: data[used..].to_vec(),
+            });
+        }
+        if data.len() >= 4 && u32::from_le_bytes(data[..4].try_into().unwrap()) == LZ4_FRAME_MAGIC {
+            let mut rest = data;
+            let mut image = Vec::new();
+            lz4_flex::frame::FrameDecoder::new(&mut rest)
+                .read_to_end(&mut image)
+                .map_err(|e| format!("lz4 frame kernel: {e}"))?;
+            return Ok(Self {
+                compression: Compression::Lz4Frame,
+                image,
+                appended: rest.to_vec(),
             });
         }
         if data.starts_with(&[0x1f, 0x8b]) {
@@ -73,6 +88,11 @@ impl Kernel {
                 enc.finish().map_err(|e| e.to_string())?
             }
             Compression::Lz4Legacy => lz4_legacy_compress(&self.image),
+            Compression::Lz4Frame => {
+                let mut enc = lz4_flex::frame::FrameEncoder::new(Vec::new());
+                enc.write_all(&self.image).map_err(|e| e.to_string())?;
+                enc.finish().map_err(|e| e.to_string())?
+            }
         };
         out.extend_from_slice(&self.appended);
         Ok(out)
@@ -170,6 +190,17 @@ mod tests {
             ),
             2
         );
+    }
+
+    #[test]
+    fn lz4_frame_dtb_round_trip() {
+        let k = Kernel {
+            compression: Compression::Lz4Frame,
+            image: fake_image(),
+            appended: DTB.to_vec(),
+        };
+        let unpacked = Kernel::unpack(&k.pack().unwrap()).unwrap();
+        assert_eq!(unpacked, k);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # pixie
 
-An operating system for AIs to use and humans to direct. Linux kernel, Rust userspace. First device: Pixel 2. Development runs on a host or emulator first.
+An operating system for AIs to use and humans to direct. Linux kernel, Rust userspace. First device: Pixel 2. Development runs on device. User can talk to the ai and ai will code new skills as it needs. It will connect with online services using mcp and will have default skills like access to internet, and be able to audio chat with the user.
 
 ## Crates
 

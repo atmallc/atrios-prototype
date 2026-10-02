@@ -94,7 +94,16 @@ impl Agent {
     pub fn runtime(&self) -> &Runtime {
         &self.runtime
     }
+
+    /// For installing skills while running, such as ones the brain wrote.
+    pub fn runtime_mut(&mut self) -> &mut Runtime {
+        &mut self.runtime
+    }
 }
+
+/// What the stand-in model says when no skill matches. The device treats this
+/// as "ask the brain instead".
+pub const NO_SKILL: &str = "I don't have a skill for that yet.";
 
 /// Stand-in model: matches keywords to installed skills.
 pub struct KeywordModel;
@@ -108,18 +117,35 @@ impl Model for KeywordModel {
             args,
         };
 
-        if ["photo", "picture", "camera"]
-            .iter()
-            .any(|w| lower.contains(w))
-            && has("camera.take_photo")
-        {
+        // Only short, plain commands are matched here; anything longer or
+        // odder goes to the brain. Whole words only, so "uptime" is not "time".
+        let words: Vec<&str> = lower
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .collect();
+        let short = words.len() <= 5;
+        let has_word = |options: &[&str]| words.iter().any(|w| options.contains(w));
+
+        if short && has_word(&["photo", "picture", "camera"]) && has("camera.take_photo") {
             return call("camera.take_photo", json!({}));
         }
-        if lower.contains("battery") && has("status.battery") {
+        if short && has_word(&["typing", "keyboard"]) && has("keyboard.typing") {
+            return call("keyboard.typing", json!({}));
+        }
+        if short && has_word(&["battery"]) && has("status.battery") {
             return call("status.battery", json!({}));
         }
-        if lower.contains("time") && has("status.time") {
+        if short && has_word(&["time"]) && has("status.time") {
             return call("status.time", json!({}));
+        }
+        if let Some(rest) = ["say ", "speak ", "read aloud "]
+            .iter()
+            .find_map(|p| lower.strip_prefix(p))
+        {
+            if has("audio.speak") && !rest.trim().is_empty() {
+                let text = request[request.len() - rest.len()..].trim();
+                return call("audio.speak", json!({ "text": text }));
+            }
         }
         if let Some(rest) = lower
             .strip_prefix("show ")
@@ -130,7 +156,23 @@ impl Model for KeywordModel {
                 return call("display.show_text", json!({ "text": text }));
             }
         }
-        Decision::Reply("I don't have a skill for that yet.".into())
+        for prefix in ["search for ", "search the web for ", "search ", "google ", "look up ", "lookup "] {
+            if let Some(rest) = lower.strip_prefix(prefix) {
+                if has("web.search") && !rest.trim().is_empty() {
+                    let query = request[request.len() - rest.len()..].trim();
+                    return call("web.search", json!({ "query": query }));
+                }
+            }
+        }
+        for prefix in ["open ", "read ", "cat ", "ls ", "list "] {
+            if let Some(rest) = lower.strip_prefix(prefix) {
+                if has("files.open") {
+                    let path = request[request.len() - rest.len()..].trim();
+                    return call("files.open", json!({ "path": path }));
+                }
+            }
+        }
+        Decision::Reply(NO_SKILL.into())
     }
 }
 
@@ -181,6 +223,37 @@ mod tests {
             Box::new(KeywordModel),
             Box::new(KeywordGuardrail::default()),
         )
+    }
+
+    #[test]
+    fn open_request_calls_files_open() {
+        let response = agent().handle("open /");
+        assert!(matches!(
+            response,
+            Response::Skill { ref skill, output: Output::Text { .. } } if skill == "files.open"
+        ));
+        assert!(matches!(
+            agent().handle("Create a skill to open a file"),
+            Response::Reply(_)
+        ));
+    }
+
+    #[test]
+    fn keywords_match_whole_words_in_short_requests_only() {
+        let reply = |q: &str| agent().handle(q);
+        assert!(matches!(reply("what time is it"), Response::Skill { ref skill, .. } if skill == "status.time"));
+        // "uptime" is not "time", and long requests belong to the brain.
+        assert!(matches!(reply("how long has the phone been on, uptime in hours and minutes"), Response::Reply(ref t) if t == NO_SKILL));
+        assert!(matches!(reply("create a skill that tells me the uptime"), Response::Reply(ref t) if t == NO_SKILL));
+    }
+
+    #[test]
+    fn say_speaks_when_there_is_a_voice_and_shows_text_otherwise() {
+        // The default agent has no audio.speak skill, so "say" falls back to the display.
+        assert!(matches!(
+            agent().handle("say hello"),
+            Response::Skill { ref skill, .. } if skill == "display.show_text"
+        ));
     }
 
     #[test]

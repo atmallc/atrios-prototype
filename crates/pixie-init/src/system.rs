@@ -4,6 +4,10 @@ use std::ffi::CString;
 use std::io;
 
 fn mount(source: &str, target: &str, fstype: &str) -> io::Result<()> {
+    mount_with(source, target, fstype, 0)
+}
+
+fn mount_with(source: &str, target: &str, fstype: &str, flags: libc::c_ulong) -> io::Result<()> {
     let _ = std::fs::create_dir_all(target);
     let c = |s: &str| CString::new(s).unwrap();
     let (source, target, fstype) = (c(source), c(target), c(fstype));
@@ -12,7 +16,7 @@ fn mount(source: &str, target: &str, fstype: &str) -> io::Result<()> {
             source.as_ptr(),
             target.as_ptr(),
             fstype.as_ptr(),
-            0,
+            flags,
             std::ptr::null(),
         )
     };
@@ -85,6 +89,58 @@ fn populate_dev() {
                 make_node(&format!("/dev/graphics/{name}"), false, major, minor);
             }
         }
+    }
+}
+
+/// The Pixel 2 touchscreen driver is a kernel module on the vendor partition,
+/// which Android loads at boot. Mounts that partition read-only and loads the
+/// Synaptics core driver (not the firmware updater, which could reflash the
+/// touch controller). `step` reports progress.
+pub fn load_touchscreen(step: &mut dyn FnMut(&str)) -> Result<(), String> {
+    step("touch: finding vendor partition");
+    let (major, minor) = ["vendor_a", "vendor_b"]
+        .iter()
+        .find_map(|name| partition_dev(name))
+        .ok_or("no vendor partition")?;
+    make_node("/dev/vendor", true, major, minor);
+    step("touch: mounting vendor");
+    mount_with("/dev/vendor", "/vendor", "ext4", libc::MS_RDONLY)
+        .map_err(|e| format!("mount vendor: {e}"))?;
+    step("touch: loading driver");
+    insmod("/vendor/lib/modules/synaptics_dsx_core_htc.ko")?;
+    // The driver registers its input device a moment after loading.
+    for _ in 0..30 {
+        populate_dev();
+        let devices = std::fs::read_to_string("/proc/bus/input/devices").unwrap_or_default();
+        if devices.to_lowercase().contains("synaptics") {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    Err("driver loaded but no touchscreen appeared".into())
+}
+
+/// Major and minor numbers of the partition named `name`, from sysfs.
+fn partition_dev(name: &str) -> Option<(u32, u32)> {
+    for entry in std::fs::read_dir("/sys/class/block").ok()?.flatten() {
+        let uevent = std::fs::read_to_string(entry.path().join("uevent")).unwrap_or_default();
+        if uevent.lines().any(|l| l.strip_prefix("PARTNAME=") == Some(name)) {
+            return parse_dev(&std::fs::read_to_string(entry.path().join("dev")).ok()?);
+        }
+    }
+    None
+}
+
+fn insmod(path: &str) -> Result<(), String> {
+    use std::os::fd::AsRawFd;
+    let file = std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?;
+    let params = CString::new("").unwrap();
+    let rc = unsafe { libc::syscall(libc::SYS_finit_module, file.as_raw_fd(), params.as_ptr(), 0) };
+    match (rc, io::Error::last_os_error().raw_os_error()) {
+        (0, _) => Ok(()),
+        (_, Some(libc::EEXIST)) => Ok(()),
+        (_, Some(code)) => Err(format!("insmod {path}: {}", io::Error::from_raw_os_error(code))),
+        _ => Err(format!("insmod {path} failed")),
     }
 }
 
